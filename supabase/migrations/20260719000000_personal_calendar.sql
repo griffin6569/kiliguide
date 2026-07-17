@@ -1,0 +1,14 @@
+insert into storage.buckets (id, name, public) values ('personal-resources', 'personal-resources', false) on conflict (id) do nothing;
+create table public.personal_resources (id uuid primary key default gen_random_uuid(), user_id uuid not null references public.profiles on delete cascade, title text not null, resource_type text not null check(resource_type in ('timetable','assignment','personal_document')), storage_path text not null, extracted_text text, processing_status text not null default 'uploaded' check(processing_status in ('uploaded','processing','ready','failed')), created_at timestamptz default now());
+create table public.calendar_events (id uuid primary key default gen_random_uuid(), user_id uuid not null references public.profiles on delete cascade, resource_id uuid references public.personal_resources on delete cascade, title text not null, starts_at timestamptz not null, ends_at timestamptz not null, location text, category text not null default 'class', created_at timestamptz default now());
+create table public.event_reminders (id uuid primary key default gen_random_uuid(), event_id uuid not null references public.calendar_events on delete cascade, minutes_before integer not null check(minutes_before between 0 and 10080), in_app boolean not null default true, email boolean not null default false, enabled boolean not null default true, delivered_at timestamptz, created_at timestamptz default now(), unique(event_id,minutes_before));
+create index calendar_events_user_start_idx on public.calendar_events(user_id,starts_at);
+create index event_reminders_delivery_idx on public.event_reminders(enabled,delivered_at);
+alter table public.personal_resources enable row level security;
+alter table public.calendar_events enable row level security;
+alter table public.event_reminders enable row level security;
+create policy "personal resources own" on public.personal_resources for all to authenticated using(user_id=auth.uid()) with check(user_id=auth.uid());
+create policy "calendar events own" on public.calendar_events for all to authenticated using(user_id=auth.uid()) with check(user_id=auth.uid());
+create policy "event reminders own" on public.event_reminders for all to authenticated using(exists(select 1 from public.calendar_events e where e.id=event_id and e.user_id=auth.uid())) with check(exists(select 1 from public.calendar_events e where e.id=event_id and e.user_id=auth.uid()));
+create policy "users upload personal resources" on storage.objects for insert to authenticated with check(bucket_id='personal-resources' and (storage.foldername(name))[1]=auth.uid()::text);
+create policy "users read personal resources" on storage.objects for select to authenticated using(bucket_id='personal-resources' and (storage.foldername(name))[1]=auth.uid()::text);

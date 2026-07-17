@@ -1,0 +1,16 @@
+alter table public.profiles add column if not exists department_id uuid references public.departments;
+alter table public.profiles add column if not exists programme text;
+alter table public.profiles add column if not exists study_year smallint;
+alter table public.profiles add column if not exists campus text;
+alter table public.documents add column if not exists audience jsonb not null default '{"roles":["student","lecturer","department","administrator"],"department_ids":[],"programmes":[],"study_years":[]}';
+alter table public.documents add column if not exists notify_on_ready boolean not null default false;
+alter table public.documents add column if not exists published_at timestamptz;
+alter table public.notices add column if not exists audience jsonb not null default '{"roles":["student","lecturer","department","administrator"],"department_ids":[],"programmes":[],"study_years":[]}';
+create table public.notification_preferences (user_id uuid primary key references public.profiles on delete cascade, in_app boolean not null default true, email boolean not null default true, notices boolean not null default true, documents boolean not null default true, reminders boolean not null default true, tickets boolean not null default true, updated_at timestamptz default now());
+create table public.notifications (id uuid primary key default gen_random_uuid(), recipient_id uuid not null references public.profiles on delete cascade, kind text not null check(kind in ('document','notice','reminder','ticket','system')), title text not null, body text not null, source_document_id uuid references public.documents on delete cascade, source_notice_id uuid references public.notices on delete cascade, event_key text not null, data jsonb not null default '{}', read_at timestamptz, created_at timestamptz default now(), unique(recipient_id,event_key));
+create index notifications_recipient_created_idx on public.notifications(recipient_id,created_at desc);
+alter table public.notification_preferences enable row level security;
+alter table public.notifications enable row level security;
+create policy "preferences own" on public.notification_preferences for all to authenticated using(user_id=auth.uid()) with check(user_id=auth.uid());
+create policy "notifications own" on public.notifications for select to authenticated using(recipient_id=auth.uid());
+create policy "notifications mark read" on public.notifications for update to authenticated using(recipient_id=auth.uid()) with check(recipient_id=auth.uid());

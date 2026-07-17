@@ -1,0 +1,8 @@
+node_modules/
+.next/
+.env.local
+.env
+*.log
+__pycache__/
+*.py[cod]
+rag_service/.venv/
