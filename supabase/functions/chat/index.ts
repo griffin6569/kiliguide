@@ -1,5 +1,4 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { geminiFetch } from "../_shared/gemini.ts";
 
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" };
 const unavailable = "Sorry, I could not find this information in the university knowledge base.";
@@ -7,8 +6,16 @@ const gemini = "https://generativelanguage.googleapis.com/v1beta/models";
 const socialMessage = /^(hi|hello|hey|habari|mambo|good (morning|afternoon|evening)|how are you|help)$/i;
 
 async function geminiJson(path: string, body: unknown) {
-  const response = await geminiFetch(`${gemini}/${path}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-  if (!response.ok) throw new Error("Gemini request failed");
+  const keys = [Deno.env.get("GEMINI_API_KEY_1"),Deno.env.get("GEMINI_API_KEY_2"),Deno.env.get("GEMINI_API_KEY_3"),Deno.env.get("GEMINI_API_KEY_4"),Deno.env.get("GEMINI_API_KEY_5"),Deno.env.get("GEMINI_API_KEY")].filter((key): key is string => Boolean(key));
+  if (!keys.length) throw new Error("No Gemini API key is configured in Supabase secrets.");
+  let response: Response | undefined;
+  const start = Math.floor(Date.now() / 1000) % keys.length;
+  for (let attempt = 0; attempt < keys.length; attempt++) {
+    const key = keys[(start + attempt) % keys.length];
+    response = await fetch(`${gemini}/${path}`, { method: "POST", headers: { "Content-Type": "application/json", "x-goog-api-key": key }, body: JSON.stringify(body) });
+    if (response.ok || ![429,500,502,503,504].includes(response.status)) break;
+  }
+  if (!response || !response.ok) throw new Error("Gemini request failed");
   return response.json();
 }
 
