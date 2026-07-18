@@ -4,6 +4,7 @@ import { geminiFetch } from "../_shared/gemini.ts";
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" };
 const unavailable = "Sorry, I could not find this information in the university knowledge base.";
 const gemini = "https://generativelanguage.googleapis.com/v1beta/models";
+const socialMessage = /^(hi|hello|hey|habari|mambo|good (morning|afternoon|evening)|how are you|help)$/i;
 
 async function geminiJson(path: string, body: unknown) {
   const response = await geminiFetch(`${gemini}/${path}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -28,6 +29,13 @@ Deno.serve(async (req) => {
     const { question, conversationId } = await req.json();
     if (typeof question !== "string" || !question.trim() || question.length > 2000) return Response.json({ error: "Invalid question" }, { status: 400, headers: CORS });
     const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    if (socialMessage.test(question.trim())) {
+      const { data: profile } = await supabase.from("profiles").select("full_name").eq("id", user.id).maybeSingle();
+      const firstName = profile?.full_name?.trim().split(/\s+/)[0] || "there";
+      const answer = `Hi ${firstName}! I’m KiliGuide, your DeKUT campus assistant. How can I help today? You can ask about registration, fees, accommodation, timetables, examinations, notices, or support.`;
+      if (conversationId) await supabase.from("messages").insert([{ conversation_id: conversationId, role: "user", content: question }, { conversation_id: conversationId, role: "assistant", content: answer, sources: [], confidence: 1 }]);
+      return Response.json({ answer, sources: [], confidence: 1, mode: "conversation" }, { headers: CORS });
+    }
     let recentTurns: string[] = [];
     if (conversationId) {
       const { data: history } = await supabase.from("messages").select("role,content").eq("conversation_id", conversationId).order("created_at", { ascending: false }).limit(4);
