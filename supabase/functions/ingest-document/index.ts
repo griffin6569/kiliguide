@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { geminiFetch } from "../_shared/gemini.ts";
 
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" };
 const gemini = "https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-2:embedContent";
@@ -11,7 +12,7 @@ function chunkText(text: string, size = 2800, overlap = 400) {
 }
 
 async function embed(text: string) {
-  const response = await fetch(gemini, { method: "POST", headers: { "Content-Type": "application/json", "x-goog-api-key": Deno.env.get("GEMINI_API_KEY")! }, body: JSON.stringify({ content: { parts: [{ text: `Represent this university document for retrieval: ${text}` }] }, output_dimensionality: 768 }) });
+  const response = await geminiFetch(gemini, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ content: { parts: [{ text: `Represent this university document for retrieval: ${text}` }] }, output_dimensionality: 768 }) });
   if (!response.ok) throw new Error("Embedding request failed");
   const body = await response.json();
   return body.embeddings?.[0]?.values as number[];

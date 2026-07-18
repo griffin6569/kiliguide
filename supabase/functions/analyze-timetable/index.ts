@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { geminiFetch } from "../_shared/gemini.ts";
 
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" };
 type ClassEvent = { title: string; start: string; end: string; location?: string };
@@ -17,7 +18,7 @@ Deno.serve(async (req) => {
     if (!resource || resource.user_id !== user.id) return Response.json({ error: "Resource not found." }, { status: 404, headers: CORS });
     await admin.from("personal_resources").update({ processing_status: "processing", extracted_text: text }).eq("id", resourceId);
     const prompt = `Extract class meetings from this student timetable. Expand every weekly class into individual events between ${semesterStart} and ${semesterEnd} in timezone ${timezone}. Return JSON only: {"events":[{"title":"Course name","start":"ISO-8601 datetime with offset","end":"ISO-8601 datetime with offset","location":"room"}]}. Do not invent unclear classes.\n\nTIMETABLE:\n${text}`;
-    const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent", { method: "POST", headers: { "Content-Type": "application/json", "x-goog-api-key": Deno.env.get("GEMINI_API_KEY")! }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0, responseMimeType: "application/json" } }) });
+    const response = await geminiFetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0, responseMimeType: "application/json" } }) });
     if (!response.ok) throw new Error("Gemini request failed");
     const result = await response.json(); const parsed = JSON.parse(result.candidates?.[0]?.content?.parts?.[0]?.text ?? "{}");
     const events: ClassEvent[] = Array.isArray(parsed.events) ? parsed.events : [];

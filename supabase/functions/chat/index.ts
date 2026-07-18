@@ -1,11 +1,12 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { geminiFetch } from "../_shared/gemini.ts";
 
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" };
 const unavailable = "Sorry, I could not find this information in the university knowledge base.";
 const gemini = "https://generativelanguage.googleapis.com/v1beta/models";
 
 async function geminiJson(path: string, body: unknown) {
-  const response = await fetch(`${gemini}/${path}`, { method: "POST", headers: { "Content-Type": "application/json", "x-goog-api-key": Deno.env.get("GEMINI_API_KEY")! }, body: JSON.stringify(body) });
+  const response = await geminiFetch(`${gemini}/${path}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
   if (!response.ok) throw new Error("Gemini request failed");
   return response.json();
 }
